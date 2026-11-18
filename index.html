@@ -69,7 +69,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .fields{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr;gap:10px}
 @media (max-width:620px){.fields{grid-template-columns:1fr 1fr}}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;min-width:0}
-input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+input[type=text],input[type=password],input[type=date],input[type=time],input[type=number],select,textarea{
   background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-width:0;font-size:15px;text-transform:none;letter-spacing:0;font-weight:400}
 textarea{font:13px/1.5 var(--mono);min-height:150px;resize:vertical}
 
@@ -154,6 +154,7 @@ table.course input{width:36px;padding:5px 2px;text-align:center;font-family:var(
     <button class="tab" role="tab" data-tab="dvojice" id="tab-dvojice">Dvojice</button>
   </div>
   <div id="note"></div>
+  <div id="login"></div>
   <main id="app" class="stack"></main>
 </div>
 
@@ -346,7 +347,7 @@ const uid = p => p + Math.random().toString(36).slice(2, 10);
 const COLS = ['players', 'events', 'settings'];
 const S = { players: {}, events: {}, settings: {}, ready: false, remote: false, readOnly: false, note: '', noteBad: false };
 const ui = { tab: 'akce', sel: null, pick: null, copied: false, confirm: null };
-let db = null, dirty = false;
+let db = null, dirty = false, loginShown = false;
 const pend = {}, chains = {};
 
 /* ---------- ukládání ---------- */
@@ -422,7 +423,9 @@ async function fbConnect(cfg) {
   const enc = b => (Array.isArray(b.flights) ? { ...b, flights: b.flights.map(f => ({ p: f })) } : b);
   const dec = b => (Array.isArray(b.flights) ? { ...b, flights: b.flights.map(f => (f && f.p) || []) } : b);
   S.fb = {
+    domain: cfg.authDomain,
     signIn: () => au.signInWithPopup(auth, new au.GoogleAuthProvider()),
+    signInPw: (email, pw) => au.signInWithEmailAndPassword(auth, email, pw),
     signOut: () => au.signOut(auth),
     onAuth: fn => au.onAuthStateChanged(auth, fn),
   };
@@ -465,12 +468,19 @@ function saveEv(id) { S.events[id].updatedAt = Date.now(); save('events', id, S.
 /* ---------- vykreslení ---------- */
 function render(fromSnap) {
   const ae = document.activeElement;
-  if (fromSnap && ae && $('app').contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.type !== 'checkbox') { dirty = true; return; }
+  if (fromSnap && ae && $('root').contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.type !== 'checkbox') { dirty = true; return; }
   dirty = false;
   $('root').classList.toggle('ro', S.readOnly);
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === ui.tab));
   $('mode').textContent = !S.ready ? 'Načítám…' : S.remote ? (S.readOnly ? (S.fb ? 'Flighty a výsledky jsou jen ke čtení. Upravuje je správce.' : 'Jen pro čtení') : 'Změny se ukládají a vidí je všichni, kdo mají stránku otevřenou.') : 'Zkušební režim: data zůstávají jen v tomto prohlížeči.';
-  $('auth').innerHTML = !S.fb ? '' : S.readOnly ? '<button class="btn sm quiet" data-act="signIn">Přihlášení správce</button>' : '<span class="muted small">' + esc(S.admin || '') + '</span><button class="btn sm quiet" data-act="signOut">Odhlásit</button>';
+  const who = S.fb && S.admin && S.admin.endsWith('@' + S.fb.domain) ? S.admin.split('@')[0] : S.admin || '';
+  $('auth').innerHTML = !S.fb ? '' : S.readOnly ? '<button class="btn sm quiet" data-act="login">Přihlášení správce</button>' : '<span class="muted small">Správce: ' + esc(who) + '</span><button class="btn sm quiet" data-act="signOut">Odhlásit</button>';
+  const showLogin = !!S.fb && S.readOnly && ui.login;
+  if (showLogin !== loginShown) {
+    loginShown = showLogin;
+    $('login').innerHTML = !showLogin ? '' : '<form class="panel" id="loginForm"><h2>Přihlášení správce</h2><div class="addrow"><label class="f">Jméno<input type="text" id="lg-name" autocomplete="username" autocapitalize="none" required></label><label class="f">Heslo<input type="password" id="lg-pw" autocomplete="current-password" required></label><button class="btn">Přihlásit</button></div><div class="row"><button type="button" class="btn sm quiet" data-act="signIn">Přihlásit se Google účtem</button><button type="button" class="btn sm quiet" data-act="login">Zavřít</button></div></form>';
+    if (showLogin) $('lg-name').focus();
+  }
   $('tab-dvojice').hidden = !!S.fb && S.readOnly;
   if ($('tab-dvojice').hidden && ui.tab === 'dvojice') ui.tab = 'akce';
   $('note').innerHTML = S.note ? '<div class="note' + (S.noteBad ? ' bad' : '') + '">' + esc(S.note) + '</div>' : '';
@@ -484,7 +494,7 @@ const cbtn = (act, id, label, cls) => {
 
 function viewEvents() {
   const pl = players(), evs = events();
-  if (!pl.length && S.readOnly) return '<div class="panel empty"><h2>Zatím tu nic není</h2><p class="muted">Správce ještě nepřidal hráče ani hry. Jakmile to udělá, uvidíte tu flighty, startovní časy a výsledky.</p>' + (S.fb ? '<p class="muted small">Jste správce? Přihlaste se Google účtem. Teprve potom se objeví úpravy, karta Dvojice a ukázková data.</p><button class="btn" data-act="signIn">Přihlášení správce</button>' : '') + '</div>';
+  if (!pl.length && S.readOnly) return '<div class="panel empty"><h2>Zatím tu nic není</h2><p class="muted">Správce ještě nepřidal hráče ani hry. Jakmile to udělá, uvidíte tu flighty, startovní časy a výsledky.</p>' + (S.fb ? '<p class="muted small">Jste správce? Přihlaste se. Teprve potom se objeví úpravy, karta Dvojice a ukázková data.</p><button class="btn" data-act="login">Přihlášení správce</button>' : '') + '</div>';
   if (!pl.length) return '<div class="panel empty"><h2>Zatím tu nejsou žádní hráči</h2><p class="muted">Začněte seznamem lidí, se kterými jezdíte. Stačí jméno a HCP. Nebo si aplikaci nejdřív vyzkoušejte na ukázkové skupině, kterou pak jedním tlačítkem smažete.</p><div class="row edit"><button class="btn" data-act="tab" data-id="hraci">Přidat hráče</button><button class="btn ghost" data-act="demo">Vyzkoušet s ukázkovou skupinou</button></div></div>';
   if (!S.events[ui.sel]) ui.sel = evs.length ? evs[0].id : null;
   let h = '<div class="evbar">' + evs.map(e => '<button class="evchip' + (e.id === ui.sel ? ' on' : '') + '" data-act="sel" data-id="' + e.id + '">' + esc(e.title || 'Hra') + '<small>' + esc(fmtDate(e.date)) + '</small></button>').join('') + '<button class="btn ghost edit" data-act="newEvent">+ Nová hra</button></div>';
@@ -648,7 +658,8 @@ const A = {
     });
     return false;
   },
-  signOut() { S.fb.signOut(); return false; },
+  signOut() { ui.login = false; S.fb.signOut(); return false; },
+  login() { ui.login = !ui.login; },
   tab(id) { ui.tab = id; try { localStorage.setItem('flighty-tab', id); } catch (e) {} },
   sel(id) { ui.sel = id; ui.pick = null; ui.copied = false; try { localStorage.setItem('flighty-sel', id); } catch (e) {} },
   ask(id, el) { ui.confirm = el.dataset.k; setTimeout(() => { if (ui.confirm === el.dataset.k) { ui.confirm = null; render(true); } }, 3500); },
@@ -716,7 +727,7 @@ $('root').addEventListener('click', e => {
   const tab = e.target.closest('.tab'); if (tab) { A.tab(tab.dataset.tab); ui.confirm = null; render(); return; }
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const act = el.dataset.act;
-  if (S.readOnly && !['sel', 'tab', 'copy', 'pick', 'signIn', 'signOut'].includes(act)) return;
+  if (S.readOnly && !['sel', 'tab', 'copy', 'pick', 'signIn', 'signOut', 'login'].includes(act)) return;
   if ((S.events[ui.sel] || {}).locked && ['su', 'allYes', 'allNone', 'mode', 'gen', 'repair', 'moveTo', 'up', 'down', 'fmt', 'delEvent', 'resetTimes', 'entry', 'net'].includes(act)) return;
   if (act !== 'ask') ui.confirm = null;
   if (act !== 'copy') ui.copied = false;
@@ -765,7 +776,20 @@ $('app').addEventListener('change', e => {
     save('players', t.dataset.p, p); render(true);
   }
 });
-$('app').addEventListener('focusout', () => setTimeout(() => { if (dirty) render(true); }, 0));
+$('login').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = $('lg-name').value.trim().toLowerCase(), pw = $('lg-pw').value;
+  if (!n || !pw || !S.fb) return;
+  // Jméno bez zavináče je účet tohoto projektu, např. Admin → admin@<doména projektu>.
+  S.fb.signInPw(n.includes('@') ? n : n + '@' + S.fb.domain, pw).then(() => { ui.login = false; }).catch(err => {
+    const c = (err && err.code) || '';
+    S.note = c === 'auth/too-many-requests' ? 'Příliš mnoho pokusů. Zkuste to za chvíli znovu.'
+      : c === 'auth/network-request-failed' ? 'Nepodařilo se spojit se serverem. Zkontrolujte připojení.'
+      : 'Nesprávné jméno nebo heslo.';
+    S.noteBad = true; $('lg-pw').value = ''; render(true);
+  });
+});
+$('root').addEventListener('focusout', () => setTimeout(() => { if (dirty) render(true); }, 0));
 $('app').addEventListener('submit', e => {
   e.preventDefault();
   if (S.readOnly) return;
