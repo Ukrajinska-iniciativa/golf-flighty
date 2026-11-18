@@ -592,12 +592,21 @@ function recompute(ev) {
     if (v == null) delete ev.results[p]; else ev.results[p] = v;
   });
 }
+// Přepis z fotky: AI v telefonu přepíše skórkartu na řádky „jméno + 18 čísel“, tady se vloží najednou.
+function bulkHtml(order) {
+  const prompt = 'Na fotce je golfová skórkarta. Přepiš počet ran každého hráče na jamkách 1 až 18. Na každý řádek napiš jméno hráče a za ním 18 čísel oddělených mezerou. Nedohranou nebo škrtnutou jamku zapiš jako 0. Když si číslem nejsi jistý, napiš za řádek otazník. Nepiš nic dalšího. Jména hráčů piš přesně takto: ' + order.map(nm).join(', ') + '.';
+  return '<div class="card edit"><label class="f">Vložit rány z přepsané skórkarty<textarea id="bulk" style="min-height:92px" placeholder="Petr N. 5 4 6 3 5 4 4 5 3 6 4 5 4 3 5 4 6 5&#10;Jana K. 6 5 7 4 6 5 5 6 4 7 5 6 5 4 6 5 7 6">' + esc(ui.bulkText || '') + '</textarea></label>' +
+    '<div class="row"><button class="btn sm" data-act="bulk">Načíst rány</button><button class="btn sm quiet" data-act="copy" data-id="ai-prompt">' + (ui.copied === 'ai-prompt' ? 'Zadání zkopírováno' : 'Zkopírovat zadání pro AI') + '</button></div>' +
+    '<p class="muted small">Postup: vyfoťte skórkartu, pošlete fotku do aplikace Claude nebo jiné AI spolu se zkopírovaným zadáním, odpověď vložte sem a klikněte na Načíst rány. Každý řádek je jméno hráče a 18 čísel. Načtená čísla pak zkontrolujte proti kartě.</p>' +
+    '<textarea id="ai-prompt" readonly style="min-height:0;height:1px;padding:0;border:0;opacity:0" tabindex="-1" aria-hidden="true">' + esc(prompt) + '</textarea></div>';
+}
 function cardsHtml(ev, order, dis) {
   const c = courseOf(ev), okSi = c.si.slice().sort((a, b) => a - b).every((v, i) => v === i + 1);
   const cell = (a, i, v) => '<td><input type="text" inputmode="numeric" id="' + a + '-' + i + '" data-' + a + '="' + i + '" value="' + v + '" aria-label="' + (a === 'par' ? 'Par' : 'Index') + ' jamky ' + (i + 1) + '"' + dis + '></td>';
   return '<div class="stack"><div class="scroll"><table class="course"><tr><th>Jamka</th>' + c.par.map((_, i) => '<th>' + (i + 1) + '</th>').join('') + '</tr><tr><th>Par</th>' + c.par.map((v, i) => cell('par', i, v)).join('') + '</tr><tr><th>Index</th>' + c.si.map((v, i) => cell('si', i, v)).join('') + '</tr></table></div>' +
     (okSi ? '' : '<div class="note bad">Indexy jamek musí být čísla 1 až 18, každé právě jednou.</div>') +
     (ev.course ? '<p class="muted small">Par a indexy jamek se uloží k této hře a příští hra je převezme.</p>' : '<div class="note">Par a index jamek opište ze skórkarty hřiště. Zatím jsou tu výchozí hodnoty (par 4, indexy 1–18) a body podle nich nebudou sedět.</div>') +
+    bulkHtml(order) +
     order.map(p => {
       const card = (ev.cards || {})[p] || [];
       return '<div class="card"><div class="row" style="justify-content:space-between"><b>' + esc(nm(p)) + '</b><label class="res small">Hrací HCP <input type="text" inputmode="numeric" id="gh-' + p + '" data-ph="' + p + '" value="' + phcpOf(ev, p) + '"' + dis + '></label></div><div class="holes">' +
@@ -681,6 +690,29 @@ const A = {
   fmt(f) { const ev = S.events[ui.sel]; ev.format = f; recompute(ev); saveEv(ui.sel); },
   entry(m) { const ev = S.events[ui.sel]; ev.entry = m; recompute(ev); saveEv(ui.sel); },
   net(v) { const ev = S.events[ui.sel]; ev.net = v === '1'; recompute(ev); saveEv(ui.sel); },
+  bulk() {
+    const ev = S.events[ui.sel], text = $('bulk').value;
+    const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cand = [...new Set((ev.flights || []).flat().concat(going(ev)))].filter(p => S.players[p]).map(p => ({ p, n: norm(S.players[p].name) }));
+    const ok = [], bad = [];
+    text.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+      const m = /^([^\d]*)(.*)$/.exec(line), name = norm(m[1]);
+      let nums = m[2].match(/\d+/g) || [];
+      if (nums.length === 1 && nums[0].length === 18) nums = nums[0].split('');
+      let hit = cand.filter(c => c.n === name);
+      if (!hit.length && name) hit = cand.filter(c => c.n.startsWith(name) || name.startsWith(c.n));
+      if (!hit.length && name) hit = cand.filter(c => c.n.split(' ')[0] === name.split(' ')[0]);
+      if (hit.length !== 1) { bad.push([line, hit.length ? 'jméno odpovídá více hráčům' : 'hráč není mezi přihlášenými']); return; }
+      if (nums.length !== 18) { bad.push([line, nums.length + ' čísel místo 18']); return; }
+      ev.cards = ev.cards || {};
+      ev.cards[hit[0].p] = nums.map(Number).map(n => (n > 0 && n < 30 ? n : null));
+      ok.push(S.players[hit[0].p].name);
+    });
+    ui.bulkText = bad.map(b => b[0]).join('\n');
+    S.note = !ok.length && !bad.length ? 'Nejdřív vložte řádky se jménem a 18 čísly.' : (ok.length ? 'Načteno: ' + ok.join(', ').replace(/\.$/, '') + '. ' : '') + (bad.length ? 'Nenačteno (' + bad.length + '): ' + bad.map(b => '„' + b[0].slice(0, 24) + '“ – ' + b[1]).join('; ') + '. Řádky zůstaly v poli k opravě.' : '');
+    S.noteBad = !!bad.length;
+    if (ok.length) { recompute(ev); saveEv(ui.sel); }
+  },
   resetTimes() { S.events[ui.sel].times = []; saveEv(ui.sel); },
   lock() { const ev = S.events[ui.sel]; ev.locked = !ev.locked; ev.lockedAt = Date.now(); ui.pick = null; saveEv(ui.sel); },
   gen() { const ev = S.events[ui.sel]; setFlights(ui.sel, Core.generate(going(ev), ctxFor(ui.sel))); },
@@ -728,7 +760,7 @@ $('root').addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const act = el.dataset.act;
   if (S.readOnly && !['sel', 'tab', 'copy', 'pick', 'signIn', 'signOut', 'login'].includes(act)) return;
-  if ((S.events[ui.sel] || {}).locked && ['su', 'allYes', 'allNone', 'mode', 'gen', 'repair', 'moveTo', 'up', 'down', 'fmt', 'delEvent', 'resetTimes', 'entry', 'net'].includes(act)) return;
+  if ((S.events[ui.sel] || {}).locked && ['su', 'allYes', 'allNone', 'mode', 'gen', 'repair', 'moveTo', 'up', 'down', 'fmt', 'delEvent', 'resetTimes', 'entry', 'net', 'bulk'].includes(act)) return;
   if (act !== 'ask') ui.confirm = null;
   if (act !== 'copy') ui.copied = false;
   if (A[act](el.dataset.id, el) !== false) render();
