@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<script src="config.js"></script>
+</head>
+<body>
+<title>Golfové flighty</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: startovní listina. Jeden sloupec, nahoře výběr akce, pod ním přihlášky a flighty jako řádky s časem startu vlevo. */
+:root{
+  --bg:#f2f5f0; --surface:#ffffff; --ink:#17231c; --muted:#5b6a61; --line:#d4dcd2;
+  --accent:#1f6b45; --accent-ink:#ffffff; --accent-soft:#deeee3;
+  --flag:#bf3327; --flag-soft:#f8e2df; --sand:#efe6c9; --sand-ink:#5a4a12;
+  --display:"Archivo","Arial Narrow",Arial,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1713; --surface:#17221c; --ink:#e6eee8; --muted:#94a49a; --line:#2b3b32;
+  --accent:#5fc08a; --accent-ink:#0b1510; --accent-soft:#1d3327;
+  --flag:#f0796e; --flag-soft:#3a1f1c; --sand:#38331f; --sand-ink:#e8d999; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1713; --surface:#17221c; --ink:#e6eee8; --muted:#94a49a; --line:#2b3b32;
+  --accent:#5fc08a; --accent-ink:#0b1510; --accent-soft:#1d3327;
+  --flag:#f0796e; --flag-soft:#3a1f1c; --sand:#38331f; --sand-ink:#e8d999; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:860px;margin:0 auto;padding-block:20px 56px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:flex;flex-direction:column;gap:18px}
+*{box-sizing:border-box}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:28px;font-weight:800;letter-spacing:-.01em}
+h2{font-size:18px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line)}
+.tab{font:600 15px var(--body);background:none;border:0;color:var(--muted);padding:9px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:6px;padding:9px 14px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.quiet{background:transparent;color:var(--muted);border-color:var(--line);font-weight:500}
+.btn.danger{background:transparent;color:var(--flag);border-color:var(--flag)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.stack{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.note{background:var(--sand);color:var(--sand-ink);border-radius:6px;padding:10px 12px;font-size:14px}
+.note.bad{background:var(--flag-soft);color:var(--flag)}
+.note .row{margin-top:8px}
+
+.evbar{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:stretch}
+.evchip{flex:none;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer;font-weight:600;display:flex;flex-direction:column;gap:1px}
+.evchip small{font:500 12px var(--mono);color:var(--muted)}
+.evchip.on{border-color:var(--accent);background:var(--accent-soft)}
+.evbar .btn{flex:none}
+
+.fields{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr;gap:10px}
+@media (max-width:620px){.fields{grid-template-columns:1fr 1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;min-width:0}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+  background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-width:0;font-size:15px;text-transform:none;letter-spacing:0;font-weight:400}
+textarea{font:13px/1.5 var(--mono);min-height:150px;resize:vertical}
+
+.signups{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.su{display:flex;justify-content:space-between;align-items:center;gap:8px;background:transparent;border:1px dashed var(--line);border-radius:6px;padding:8px 10px;cursor:pointer;text-align:left;min-width:0}
+.su .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.su .st{font:700 11px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);flex:none}
+.su.yes{background:var(--accent-soft);border:1px solid var(--accent)}
+.su.yes .st{color:var(--accent)}
+.su.no{border:1px solid var(--line)}
+.su.no .nm{text-decoration:line-through;color:var(--muted)}
+.su.no .st{color:var(--flag)}
+.tally{font:500 13px var(--mono);color:var(--muted)}
+.tally b{color:var(--ink)}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:8px 12px;cursor:pointer;font-weight:500;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--bg)}
+
+.sheet{display:flex;flex-direction:column;border-top:2px solid var(--ink)}
+.fl{display:grid;grid-template-columns:108px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.fl .tee{font:700 20px var(--mono);font-variant-numeric:tabular-nums;line-height:1.1}
+.fl .tee small{display:block;font:500 11px var(--body);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.fl .body{display:flex;flex-direction:column;gap:8px;min-width:0}
+.fl .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.fl .meta .sp{flex:1}
+.fl .tee input{font:700 16px var(--mono);padding:5px 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:8px;align-items:baseline;font-weight:500}
+.chip i{font:500 12px var(--mono);font-style:normal;color:var(--muted)}
+.chip.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.sel i{color:var(--bg)}
+.chip.here{border-style:dashed;color:var(--accent);border-color:var(--accent);background:transparent}
+.badge{font:700 11px var(--mono);padding:2px 7px;border-radius:4px;background:var(--flag-soft);color:var(--flag)}
+.badge.ok{background:var(--accent-soft);color:var(--accent)}
+.icon{background:transparent;border:1px solid var(--line);border-radius:4px;width:26px;height:24px;cursor:pointer;color:var(--muted);line-height:1;padding:0}
+.icon:disabled{opacity:.3;cursor:default}
+
+table{border-collapse:collapse;width:100%}
+td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+td.num,th.num{width:96px}
+td.act{width:1%;white-space:nowrap;text-align:right}
+td input{padding:6px 8px}
+.tag{font:700 10px var(--mono);text-transform:uppercase;background:var(--sand);color:var(--sand-ink);padding:2px 6px;border-radius:4px;margin-left:6px}
+.addrow{display:grid;grid-template-columns:2fr 1fr auto;gap:8px;align-items:end}
+.pairrow{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:end}
+@media (max-width:560px){.pairrow{grid-template-columns:1fr 1fr}.addrow{grid-template-columns:1fr 1fr}.addrow .btn,.pairrow .btn{grid-column:1/-1}}
+.ro .edit,.lk .edit{display:none!important}
+.resgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.res{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;font-weight:500}
+.res span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res input{width:68px;flex:none;text-align:right;font-family:var(--mono)}
+td.rk,th.rk{width:44px;font:700 14px var(--mono)}
+td.val,th.val{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tabs{overflow-x:auto;overflow-y:hidden}
+.scroll{overflow-x:auto}
+table.course{width:auto}
+table.course th,table.course td{padding:3px;border:0;font-size:12px;text-align:center}
+table.course input{width:36px;padding:5px 2px;text-align:center;font-family:var(--mono)}
+.card{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.holes{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.holes input{padding:7px 2px;text-align:center;font-family:var(--mono)}
+.empty{text-align:center;padding:28px 12px;display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty p{max-width:46ch}
+@media (prefers-reduced-motion:no-preference){.chip,.su,.btn{transition:background-color .12s,border-color .12s}}
+</style>
+
+<div class="wrap" id="root">
+  <div class="top">
+    <div>
+      <h1>Golfové flighty</h1>
+      <p class="muted small" id="mode">Načítám…</p>
+    </div>
+    <div class="row" id="auth"></div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="akce" id="tab-akce">Hry</button>
+    <button class="tab" role="tab" data-tab="sezona" id="tab-sezona">Sezóna</button>
+    <button class="tab" role="tab" data-tab="hraci" id="tab-hraci">Hráči</button>
+    <button class="tab" role="tab" data-tab="dvojice" id="tab-dvojice">Dvojice</button>
+  </div>
+  <div id="note"></div>
+  <main id="app" class="stack"></main>
+</div>
+
+<script id="core">
+/* Logika skládání flightů – bez závislosti na stránce. */
+const Core = (() => {
+  const key = (a, b) => (a < b ? a + '|' + b : b + '|' + a);
+  const DEF_HCP = 28;
+
+  // Počty hráčů ve flightech: co nejvíc čtveřic a trojic, nikdy nikdo sám.
+  function flightSizes(n) {
+    if (n <= 0) return [];
+    const k = Math.ceil(n / 4), base = Math.floor(n / k), extra = n % k;
+    return Array.from({ length: k }, (_, i) => (i < k - extra ? base : base + 1));
+  }
+
+  // Kdo s kým hrál v posledních akcích; novější akce váží víc.
+  function history(events, currentId) {
+    const w = [1, 0.8, 0.6, 0.4, 0.3, 0.2], hist = {};
+    Object.keys(events).filter(id => id !== currentId && (events[id].flights || []).length)
+      .sort((a, b) => String(events[b].date).localeCompare(String(events[a].date)))
+      .slice(0, w.length)
+      .forEach((id, i) => events[id].flights.forEach(f => {
+        for (let x = 0; x < f.length; x++) for (let y = x + 1; y < f.length; y++) {
+          const k = key(f[x], f[y]); hist[k] = (hist[k] || 0) + w[i];
+        }
+      }));
+    return hist;
+  }
+
+  const hcpOf = (ctx, p) => (typeof ctx.hcp[p] === 'number' ? ctx.hcp[p] : DEF_HCP);
+
+  function violations(flights, ctx) {
+    const where = {}, out = [];
+    flights.forEach((f, i) => f.forEach(p => (where[p] = i)));
+    (ctx.pairs || []).forEach(r => {
+      if (!(r.a in where) || !(r.b in where)) return;
+      const same = where[r.a] === where[r.b];
+      if (r.type === 'together' && !same) out.push({ type: 'together', a: r.a, b: r.b, flights: [where[r.a], where[r.b]] });
+      if (r.type === 'apart' && same) out.push({ type: 'apart', a: r.a, b: r.b, flights: [where[r.a]] });
+    });
+    return out;
+  }
+
+  function cost(flights, ctx) {
+    let c = 1000 * violations(flights, ctx).length;
+    const means = [];
+    flights.forEach(f => {
+      if (!f.length) return;
+      let sum = 0, mn = Infinity, mx = -Infinity;
+      for (let x = 0; x < f.length; x++) {
+        const h = hcpOf(ctx, f[x]); sum += h; mn = Math.min(mn, h); mx = Math.max(mx, h);
+        for (let y = x + 1; y < f.length; y++) c += 10 * (ctx.hist[key(f[x], f[y])] || 0);
+      }
+      means.push(sum / f.length);
+      if (ctx.mode === 'level') c += 2 * (mx - mn);
+    });
+    if (ctx.mode === 'balanced' && means.length) {
+      const m = means.reduce((a, b) => a + b, 0) / means.length;
+      means.forEach(x => (c += 4 * (x - m) * (x - m)));
+    }
+    return c;
+  }
+
+  function climb(flights, ctx) {
+    let cur = cost(flights, ctx);
+    for (let guard = 0; guard < 200; guard++) {
+      let best = null, bestC = cur - 1e-9;
+      for (let i = 0; i < flights.length; i++) for (let j = i + 1; j < flights.length; j++)
+        for (let a = 0; a < flights[i].length; a++) for (let b = 0; b < flights[j].length; b++) {
+          const t = flights[i][a]; flights[i][a] = flights[j][b]; flights[j][b] = t;
+          const c = cost(flights, ctx);
+          if (c < bestC) { bestC = c; best = [i, a, j, b]; }
+          flights[j][b] = flights[i][a]; flights[i][a] = t;
+        }
+      if (!best) break;
+      const [i, a, j, b] = best, t = flights[i][a];
+      flights[i][a] = flights[j][b]; flights[j][b] = t; cur = bestC;
+    }
+    return cur;
+  }
+
+  function tidy(flights, ctx) {
+    flights.forEach(f => f.sort((a, b) => hcpOf(ctx, a) - hcpOf(ctx, b)));
+    const mean = f => f.reduce((s, p) => s + hcpOf(ctx, p), 0) / f.length;
+    // Menší flighty jdou první (hrají rychleji); při řazení podle HCP nižší HCP dřív.
+    return flights.filter(f => f.length).sort((a, b) =>
+      ctx.mode === 'level' ? mean(a) - mean(b) : a.length - b.length);
+  }
+
+  function generate(pids, ctx, rnd) {
+    rnd = rnd || Math.random;
+    const sizes = flightSizes(pids.length);
+    if (!sizes.length) return [];
+    let best = null, bestC = Infinity;
+    for (let r = 0; r < 40; r++) {
+      const s = pids.slice();
+      for (let i = s.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; }
+      let at = 0; const fl = sizes.map(n => s.slice(at, (at += n)));
+      const c = climb(fl, ctx);
+      if (c < bestC) { bestC = c; best = fl; }
+    }
+    return tidy(best, ctx);
+  }
+
+  // Oprava po změně přihlášek: zachovat co nejvíc z původního složení.
+  function repair(flights, pids, ctx) {
+    if (!pids.length) return [];
+    const set = new Set(pids);
+    let fl = flights.map(f => f.filter(p => set.has(p))).filter(f => f.length);
+    const placed = new Set(fl.flat()), pool = pids.filter(p => !placed.has(p));
+    const k = Math.ceil(pids.length / 4);
+    while (fl.length > k) {
+      let i = 0; fl.forEach((f, x) => { if (f.length < fl[i].length) i = x; });
+      pool.push(...fl.splice(i, 1)[0]);
+    }
+    while (fl.length < k) fl.push([]);
+    const bestTarget = (p, cands) => {
+      let bi = cands[0], bc = Infinity;
+      cands.forEach(i => { fl[i].push(p); const c = cost(fl, ctx); fl[i].pop(); if (c < bc) { bc = c; bi = i; } });
+      return bi;
+    };
+    pool.forEach(p => {
+      const mn = Math.min(...fl.map(f => f.length));
+      fl[bestTarget(p, fl.map((f, i) => i).filter(i => fl[i].length === mn))].push(p);
+    });
+    for (let guard = 0; guard < 60; guard++) {
+      const lens = fl.map(f => f.length), mx = Math.max(...lens), mn = Math.min(...lens);
+      if (mx - mn <= 1) break;
+      const from = lens.indexOf(mx), to = lens.indexOf(mn);
+      let bp = 0, bc = Infinity;
+      fl[from].forEach((p, x) => {
+        fl[from].splice(x, 1); fl[to].push(p);
+        const c = cost(fl, ctx); if (c < bc) { bc = c; bp = x; }
+        fl[to].pop(); fl[from].splice(x, 0, p);
+      });
+      fl[to].push(fl[from].splice(bp, 1)[0]);
+    }
+    return fl.filter(f => f.length);
+  }
+
+  // Pořadí akce: stableford = víc je líp, rány = míň je líp. Shodný výsledek = shodné místo.
+  function rank(results, format) {
+    const rows = Object.keys(results || {}).filter(p => typeof results[p] === 'number').map(p => ({ pid: p, val: results[p] }));
+    rows.sort((a, b) => (format === 'strokes' ? a.val - b.val : b.val - a.val));
+    rows.forEach((r, i) => (r.rank = i && rows[i - 1].val === r.val ? rows[i - 1].rank : i + 1));
+    return rows;
+  }
+  // Sezóna: body za umístění (vítěz = počet hráčů s výsledkem, další vždy o bod méně).
+  function season(events) {
+    const t = {};
+    events.forEach(ev => {
+      const rows = rank(ev.results, ev.format);
+      if (rows.length < 2) return;
+      rows.forEach(r => {
+        const s = t[r.pid] || (t[r.pid] = { pid: r.pid, events: 0, wins: 0, points: 0 });
+        s.events++; if (r.rank === 1) s.wins++; s.points += rows.length - r.rank + 1;
+      });
+    });
+    const out = Object.values(t).sort((a, b) => b.points - a.points || b.wins - a.wins);
+    out.forEach((r, i) => (r.rank = i && out[i - 1].points === r.points && out[i - 1].wins === r.wins ? out[i - 1].rank : i + 1));
+    return out;
+  }
+
+  // Stableford z ran po jamkách: body = par + obdržené rány − zahrané rány + 2, nejméně 0.
+  // Obdržené rány se rozdělují podle indexu jamky (1 = nejtěžší) a hracího HCP.
+  function stableford(card, par, si, phcp) {
+    let points = 0, gross = 0, filled = 0;
+    const base = Math.floor(Math.abs(phcp) / 18), rem = Math.abs(phcp) % 18;
+    for (let h = 0; h < 18; h++) {
+      const g = card && card[h];
+      if (typeof g !== 'number' || g <= 0) continue;
+      const s = si[h] || 18;
+      const rec = phcp >= 0 ? base + (s <= rem ? 1 : 0) : -(base + (s > 18 - rem ? 1 : 0));
+      points += Math.max(0, (par[h] || 4) + rec - g + 2); gross += g; filled++;
+    }
+    return { points, gross, filled };
+  }
+
+  return { key, flightSizes, history, violations, cost, generate, repair, rank, season, stableford };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = p => p + Math.random().toString(36).slice(2, 10);
+const COLS = ['players', 'events', 'settings'];
+const S = { players: {}, events: {}, settings: {}, ready: false, remote: false, readOnly: false, note: '', noteBad: false };
+const ui = { tab: 'akce', sel: null, pick: null, copied: false, confirm: null };
+let db = null, dirty = false;
+const pend = {}, chains = {};
+
+/* ---------- ukládání ---------- */
+function persistLocal() { try { localStorage.setItem('flighty', JSON.stringify({ players: S.players, events: S.events, settings: S.settings })); } catch (e) {} }
+function save(col, id, data) {
+  if (!db) { persistLocal(); return; }
+  const path = col + '/' + id, body = data ? JSON.parse(JSON.stringify(data)) : null;
+  pend[path] = (pend[path] || 0) + 1;
+  chains[path] = (chains[path] || Promise.resolve())
+    .then(() => (body ? db.doc(path).set(body) : db.doc(path).delete()))
+    .catch(e => {
+      if (e && (e.code === 'invalid_argument' || e.code === 'permission-denied')) { S.readOnly = true; S.note = 'Tuto stránku můžete jen prohlížet. Změny ukládá její majitelka.'; }
+      else if (e && e.code === 'quota_exceeded') S.note = 'Úložiště je plné. Smažte staré hry a zkuste to znovu.';
+      else S.note = 'Změnu se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu.';
+      S.noteBad = true;
+    })
+    .then(() => { pend[path]--; render(); });
+}
+function applySnap(col, snap) {
+  const next = {};
+  snap.docs.forEach(d => { if (!(pend[col + '/' + d.id] > 0)) next[d.id] = JSON.parse(JSON.stringify(d.data())); });
+  for (const id in S[col]) if (pend[col + '/' + id] > 0) next[id] = S[col][id];
+  S[col] = next;
+}
+async function init() {
+  try { ui.sel = localStorage.getItem('flighty-sel'); ui.tab = localStorage.getItem('flighty-tab') || 'akce'; } catch (e) {}
+  render();
+  let d = null;
+  try { d = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) {}
+  if (!d && window.FLIGHTY_FIREBASE) {
+    try { d = await fbConnect(window.FLIGHTY_FIREBASE); }
+    catch (e) { S.note = 'Nepodařilo se připojit k databázi. Zkuste stránku načíst znovu.'; S.noteBad = true; S.ready = true; S.readOnly = true; render(); return; }
+  }
+  if (!d) {
+    try { const j = JSON.parse(localStorage.getItem('flighty') || 'null'); if (j) COLS.forEach(c => (S[c] = j[c] || {})); } catch (e) {}
+    S.ready = true; render(); return;
+  }
+  db = d; S.remote = true;
+  const loaded = {}, need = S.fb ? ['players', 'events'] : COLS;
+  const timer = setTimeout(() => { S.ready = true; S.note = 'Data se zatím nedaří načíst. To, co vidíte, nemusí být aktuální.'; render(true); }, 10000);
+  need.forEach(col => db.collection(col).onSnapshot(snap => {
+    applySnap(col, snap);
+    if (!snap.metadata.fromCache) loaded[col] = 1;
+    if (need.every(c => loaded[c])) { clearTimeout(timer); S.ready = true; if (!S.noteBad) S.note = ''; }
+    render(true);
+  }, () => { clearTimeout(timer); S.ready = true; S.note = 'Uložená data teď nejsou dostupná.'; S.noteBad = true; render(true); }));
+  if (S.fb) {
+    // Veřejná verze: všichni čtou, měnit může jen přihlášený správce. Pravidla dvojic vidí jen správce.
+    let unsub = null;
+    S.readOnly = true;
+    S.fb.onAuth(u => {
+      if (unsub) { unsub(); unsub = null; }
+      S.readOnly = true; S.admin = null; S.settings = {};
+      if (u) unsub = db.collection('settings').onSnapshot(snap => {
+        applySnap('settings', snap); S.readOnly = false; S.admin = u.email; S.note = ''; S.noteBad = false; render(true);
+      }, () => { S.note = 'Účet ' + u.email + ' nemá oprávnění správce.'; S.noteBad = true; S.fb.signOut(); render(true); });
+      render(true);
+    });
+    return;
+  }
+  try {
+    const user = await window.claude.use('user');
+    if (user && (await user.can('data.write')) === false) { S.readOnly = true; render(true); }
+  } catch (e) {}
+}
+
+/* Veřejná verze mimo claude.ai: data ve Firebase Firestore, správce se hlásí Google účtem. */
+async function fbConnect(cfg) {
+  const V = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-';
+  const [appM, fs, au] = await Promise.all([import(V + 'app.js'), import(V + 'firestore.js'), import(V + 'auth.js')]);
+  const app = appM.initializeApp(cfg), store = fs.getFirestore(app), auth = au.getAuth(app);
+  // Firestore neumí pole v poli, flighty se proto ukládají jako [{p:[...]}].
+  const enc = b => (Array.isArray(b.flights) ? { ...b, flights: b.flights.map(f => ({ p: f })) } : b);
+  const dec = b => (Array.isArray(b.flights) ? { ...b, flights: b.flights.map(f => (f && f.p) || []) } : b);
+  S.fb = {
+    signIn: () => au.signInWithPopup(auth, new au.GoogleAuthProvider()),
+    signOut: () => au.signOut(auth),
+    onAuth: fn => au.onAuthStateChanged(auth, fn),
+  };
+  return {
+    doc: p => ({ set: b => fs.setDoc(fs.doc(store, p), enc(b)), delete: () => fs.deleteDoc(fs.doc(store, p)) }),
+    collection: c => ({
+      onSnapshot: (next, err) => fs.onSnapshot(fs.collection(store, c),
+        s => next({ docs: s.docs.map(d => ({ id: d.id, data: () => dec(d.data()) })), metadata: s.metadata }), err),
+    }),
+  };
+}
+
+/* ---------- pomocné ---------- */
+const players = () => Object.keys(S.players).map(id => ({ id, ...S.players[id] })).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+const events = () => Object.keys(S.events).map(id => ({ id, ...S.events[id] })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+const pairs = () => ((S.settings.pairs || {}).list || []).filter(r => S.players[r.a] && S.players[r.b]);
+const fmtHcp = h => (typeof h === 'number' ? h.toLocaleString('cs-CZ', { maximumFractionDigits: 1 }) : '–');
+const parseHcp = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? Math.max(-10, Math.min(54, Math.round(n * 10) / 10)) : null; };
+const fmtDate = d => { if (!d) return 'bez data'; const t = new Date(d + 'T12:00'); return isNaN(t) ? d : t.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' }); };
+const nm = id => (S.players[id] ? S.players[id].name : '?');
+function teeTime(ev, i) {
+  if (ev.times && ev.times[i]) return ev.times[i]; // ručně zadaný čas má přednost před intervalem
+  const m = /^(\d{1,2}):(\d{2})$/.exec(ev.firstTee || ''); if (!m) return '–';
+  const t = (+m[1]) * 60 + (+m[2]) + i * (+ev.interval || 10);
+  return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+}
+function nextSaturday() { const d = new Date(); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7)); return d.toISOString().slice(0, 10); }
+const going = ev => Object.keys(ev.signups || {}).filter(p => ev.signups[p] === 'yes' && S.players[p]);
+function ctxFor(id) {
+  const hcp = {}; Object.keys(S.players).forEach(p => (hcp[p] = S.players[p].hcp));
+  return { hcp, pairs: pairs(), hist: Core.history(S.events, id), mode: S.events[id].mode || 'balanced' };
+}
+function exportText(ev) {
+  const lines = ['⛳ ' + (ev.title || 'Golf') + ' – ' + fmtDate(ev.date), ''];
+  (ev.flights || []).forEach((f, i) => lines.push(teeTime(ev, i) + '  Flight ' + (i + 1) + ': ' + f.map(p => nm(p) + ' (' + fmtHcp((S.players[p] || {}).hcp) + ')').join(', ')));
+  return lines.join('\n');
+}
+function saveEv(id) { S.events[id].updatedAt = Date.now(); save('events', id, S.events[id]); }
+
+/* ---------- vykreslení ---------- */
+function render(fromSnap) {
+  const ae = document.activeElement;
+  if (fromSnap && ae && $('app').contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName) && ae.type !== 'checkbox') { dirty = true; return; }
+  dirty = false;
+  $('root').classList.toggle('ro', S.readOnly);
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === ui.tab));
+  $('mode').textContent = !S.ready ? 'Načítám…' : S.remote ? (S.readOnly ? (S.fb ? 'Flighty a výsledky jsou jen ke čtení. Upravuje je správce.' : 'Jen pro čtení') : 'Změny se ukládají a vidí je všichni, kdo mají stránku otevřenou.') : 'Zkušební režim: data zůstávají jen v tomto prohlížeči.';
+  $('auth').innerHTML = !S.fb ? '' : S.readOnly ? '<button class="btn sm quiet" data-act="signIn">Přihlášení správce</button>' : '<span class="muted small">' + esc(S.admin || '') + '</span><button class="btn sm quiet" data-act="signOut">Odhlásit</button>';
+  $('tab-dvojice').hidden = !!S.fb && S.readOnly;
+  if ($('tab-dvojice').hidden && ui.tab === 'dvojice') ui.tab = 'akce';
+  $('note').innerHTML = S.note ? '<div class="note' + (S.noteBad ? ' bad' : '') + '">' + esc(S.note) + '</div>' : '';
+  if (!S.ready) { $('app').innerHTML = '<div class="panel empty"><p class="muted">Načítám hráče a hry…</p></div>'; return; }
+  $('app').innerHTML = ui.tab === 'hraci' ? viewPlayers() : ui.tab === 'dvojice' ? viewPairs() : ui.tab === 'sezona' ? viewSeason() : viewEvents();
+}
+const cbtn = (act, id, label, cls) => {
+  const k = act + ':' + id, on = ui.confirm === k;
+  return '<button class="btn sm edit ' + (cls || 'quiet') + '" data-act="' + (on ? act : 'ask') + '" data-id="' + esc(id) + '" data-k="' + esc(k) + '">' + (on ? 'Opravdu?' : label) + '</button>';
+};
+
+function viewEvents() {
+  const pl = players(), evs = events();
+  if (!pl.length && S.readOnly) return '<div class="panel empty"><h2>Zatím tu nic není</h2><p class="muted">Správce ještě nepřidal hráče ani hry. Jakmile to udělá, uvidíte tu flighty, startovní časy a výsledky.</p></div>';
+  if (!pl.length) return '<div class="panel empty"><h2>Zatím tu nejsou žádní hráči</h2><p class="muted">Začněte seznamem lidí, se kterými jezdíte. Stačí jméno a HCP. Nebo si aplikaci nejdřív vyzkoušejte na ukázkové skupině, kterou pak jedním tlačítkem smažete.</p><div class="row edit"><button class="btn" data-act="tab" data-id="hraci">Přidat hráče</button><button class="btn ghost" data-act="demo">Vyzkoušet s ukázkovou skupinou</button></div></div>';
+  if (!S.events[ui.sel]) ui.sel = evs.length ? evs[0].id : null;
+  let h = '<div class="evbar">' + evs.map(e => '<button class="evchip' + (e.id === ui.sel ? ' on' : '') + '" data-act="sel" data-id="' + e.id + '">' + esc(e.title || 'Hra') + '<small>' + esc(fmtDate(e.date)) + '</small></button>').join('') + '<button class="btn ghost edit" data-act="newEvent">+ Nová hra</button></div>';
+  const ev = S.events[ui.sel];
+  if (!ev) return h + '<div class="panel empty"><h2>Založte první hru</h2><p class="muted">Hra je jeden výjezd na hřiště: datum, startovní časy a kdo hraje.</p><button class="btn edit" data-act="newEvent">+ Nová hra</button></div>';
+  const id = ui.sel, yes = going(ev), no = pl.filter(p => (ev.signups || {})[p.id] === 'no').length;
+
+  const L = ev.locked ? ' lk' : '', dis = ev.locked || S.readOnly ? ' disabled' : '';
+  h += '<section class="panel"><div class="fields">' +
+    '<label class="f">Hřiště / název<input type="text" id="ev-title" data-f="title" value="' + esc(ev.title || '') + '"' + dis + '></label>' +
+    '<label class="f">Datum<input type="date" id="ev-date" data-f="date" value="' + esc(ev.date || '') + '"' + dis + '></label>' +
+    '<label class="f">První start<input type="time" id="ev-tee" data-f="firstTee" value="' + esc(ev.firstTee || '') + '"' + dis + '></label>' +
+    '<label class="f">Interval<select id="ev-int" data-f="interval"' + dis + '>' + [7, 8, 9, 10, 12, 15].map(n => '<option value="' + n + '"' + (+ev.interval === n ? ' selected' : '') + '>' + n + ' min</option>').join('') + '</select></label>' +
+    '</div><div class="row">' + (ev.locked ? '<span class="badge ok">Uzamčeno ' + esc(new Date(ev.lockedAt || Date.now()).toLocaleString('cs-CZ', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })) + '</span><span class="muted small">Přihlášky, flighty ani výsledky teď nejdou měnit.</span>' : '') +
+    '<button class="btn sm quiet edit" data-act="lock">' + (ev.locked ? 'Odemknout' : 'Uzamknout hru') + '</button>' + (ev.locked ? '' : cbtn('delEvent', id, 'Smazat hru', 'danger')) + '</div></section>';
+
+  h += '<section class="panel' + L + '"><div class="row" style="justify-content:space-between"><h2>Kdo hraje</h2><span class="tally"><b>' + yes.length + '</b> hraje · ' + no + ' nehraje · ' + (pl.length - yes.length - no) + ' bez odpovědi</span></div>' +
+    '<div class="signups">' + pl.map(p => {
+      const st = (ev.signups || {})[p.id] || '';
+      return '<button class="su ' + st + '" data-act="su" data-id="' + p.id + '" title="Kliknutím přepnete: hraje → nehraje → bez odpovědi"><span class="nm">' + esc(p.name) + '</span><span class="st">' + (st === 'yes' ? 'hraje' : st === 'no' ? 'nehraje' : '?') + '</span></button>';
+    }).join('') + '</div><div class="row edit"><button class="btn sm quiet" data-act="allYes">Všichni hrají</button><button class="btn sm quiet" data-act="allNone">Vymazat odpovědi</button></div></section>';
+
+  // flighty
+  const fl = (ev.flights || []).map(f => f.filter(p => S.players[p])).filter(f => f.length), inFl = new Set(fl.flat());
+  const added = yes.filter(p => !inFl.has(p)), dropped = [...inFl].filter(p => !yes.includes(p));
+  const mode = ev.mode || 'balanced', sizes = Core.flightSizes(yes.length);
+  h += '<section class="panel' + L + '"><div class="row" style="justify-content:space-between"><h2>Flighty</h2><span class="tally">' + (sizes.length ? yes.length + ' hráčů → ' + sizes.slice().sort((a, b) => b - a).join(' + ') : 'nikdo přihlášený') + '</span></div>' +
+    '<div class="row edit"><div class="seg" role="group" aria-label="Způsob rozdělení">' + [['balanced', 'Vyrovnané'], ['level', 'Podle HCP'], ['random', 'Náhodně']].map(m => '<button class="' + (mode === m[0] ? 'on' : '') + '" data-act="mode" data-id="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>' +
+    '<button class="btn" data-act="gen"' + (yes.length < 2 ? ' disabled' : '') + '>' + (fl.length ? 'Složit znovu' : 'Složit flighty') + '</button></div>' +
+    '<p class="muted small">' + (mode === 'balanced' ? 'Každý flight má podobný průměr HCP, silnější a slabší hráči se promíchají.' : mode === 'level' ? 'Hráči s podobným HCP hrají spolu, nižší HCP startují dřív.' : 'Losování. Pravidla dvojic a střídání spoluhráčů platí i tady.') + ' Vždy se hlídá, kdo s kým hrál minule.</p>';
+
+  if (fl.length && (added.length || dropped.length)) {
+    h += '<div class="note">Přihlášky se od složení změnily.' + (added.length ? ' Přibyli: ' + esc(added.map(nm).join(', ')) + '.' : '') + (dropped.length ? ' Odpadli: ' + esc(dropped.map(nm).join(', ')) + '.' : '') +
+      '<div class="row edit"><button class="btn sm" data-act="repair">Upravit s co nejméně změnami</button><button class="btn sm ghost" data-act="gen">Složit celé znovu</button></div></div>';
+  }
+  if (fl.length) {
+    const ctx = ctxFor(id), viol = Core.violations(fl, ctx);
+    if (ui.pick && !inFl.has(ui.pick)) ui.pick = null;
+    h += '<div class="sheet">' + fl.map((f, i) => {
+      const avg = f.reduce((s, p) => s + (typeof S.players[p].hcp === 'number' ? S.players[p].hcp : 28), 0) / f.length;
+      const bad = viol.filter(v => v.flights.includes(i)).map(v => '<span class="badge">' + esc(nm(v.a) + ' a ' + nm(v.b) + (v.type === 'apart' ? ' nemají být spolu' : ' mají být spolu')) + '</span>');
+      let rep = 0; for (let x = 0; x < f.length; x++) for (let y = x + 1; y < f.length; y++) if (ctx.hist[Core.key(f[x], f[y])] >= 1) rep++;
+      if (f.length > 4) bad.push('<span class="badge">' + f.length + ' hráčů, maximum jsou 4</span>');
+      if (f.length < 2) bad.push('<span class="badge">hráč je sám</span>');
+      return '<div class="fl"><div class="tee">' + (dis ? teeTime(ev, i) : '<input type="time" id="tt-' + i + '" data-t="' + i + '" value="' + esc(teeTime(ev, i)) + '" aria-label="Start flightu ' + (i + 1) + '">') + '<small>Flight ' + (i + 1) + '</small></div><div class="body"><div class="chips">' +
+        f.map(p => '<button class="chip' + (ui.pick === p ? ' sel' : '') + '" data-act="pick" data-id="' + p + '">' + esc(nm(p)) + '<i>' + fmtHcp(S.players[p].hcp) + '</i></button>').join('') +
+        (ui.pick && !f.includes(ui.pick) ? '<button class="chip here edit" data-act="moveTo" data-id="' + i + '">+ přesunout sem</button>' : '') +
+        '</div><div class="meta"><span>⌀ HCP ' + fmtHcp(Math.round(avg * 10) / 10) + '</span>' + (rep ? '<span>' + rep + '× stejná dvojice jako minule</span>' : '') + bad.join('') + '<span class="sp"></span>' +
+        '<button class="icon edit" data-act="up" data-id="' + i + '"' + (i ? '' : ' disabled') + ' aria-label="Posunout na dřívější start">↑</button><button class="icon edit" data-act="down" data-id="' + i + '"' + (i < fl.length - 1 ? '' : ' disabled') + ' aria-label="Posunout na pozdější start">↓</button></div></div></div>';
+    }).join('') + '</div>' +
+      '<p class="muted small edit">' + (ui.pick ? 'Vybrán ' + esc(nm(ui.pick)) + '. Klikněte na jiného hráče a prohodí se, nebo zvolte „přesunout sem“.' : 'Ruční úprava: klikněte na hráče a pak na toho, s kým ho chcete prohodit. Čas startu u každého flightu můžete přepsat.') + '</p>' +
+      ((ev.times || []).some(Boolean) ? '<div class="row edit"><button class="btn sm quiet" data-act="resetTimes">Vrátit časy podle intervalu</button></div>' : '') +
+      '<div class="stack"><div class="row" style="justify-content:space-between"><h2>Zpráva do skupiny</h2><button class="btn sm" data-act="copy" data-id="export">' + (ui.copied === 'export' ? 'Zkopírováno' : 'Zkopírovat') + '</button></div><textarea id="export" readonly>' + esc(exportText({ ...ev, flights: fl })) + '</textarea></div>';
+  } else h += '<p class="muted">' + (yes.length < 2 ? 'Označte nahoře aspoň dva hráče, kteří hrají.' : 'Až budou přihlášky hotové, složte flighty jedním tlačítkem.') + '</p>';
+  h += '</section>';
+
+  // výsledky
+  const order = [...new Set(fl.flat().concat(yes))];
+  if (order.length) {
+    const fmt = ev.format === 'strokes' ? 'strokes' : 'stb', res = {};
+    Object.keys(ev.results || {}).forEach(p => { if (S.players[p]) res[p] = ev.results[p]; });
+    const rows = Core.rank(res, fmt), unit = fmt === 'strokes' ? ' ran' : ' b.';
+    h += '<section class="panel' + L + '"><div class="row" style="justify-content:space-between"><h2>Výsledky</h2>' +
+      '<div class="seg edit" role="group" aria-label="Formát hry">' + [['stb', 'Stableford'], ['strokes', 'Na rány']].map(m => '<button class="' + (fmt === m[0] ? 'on' : '') + '" data-act="fmt" data-id="' + m[0] + '">' + m[1] + '</button>').join('') + '</div></div>' +
+      '<div class="row edit"><div class="seg" role="group" aria-label="Způsob zápisu">' + [['total', 'Zapsat jen výsledek'], ['holes', 'Rány po jamkách']].map(m => '<button class="' + ((ev.entry === 'holes' ? 'holes' : 'total') === m[0] ? 'on' : '') + '" data-act="entry" data-id="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>' +
+      (ev.entry === 'holes' && fmt === 'strokes' ? '<div class="seg" role="group" aria-label="Brutto nebo netto">' + [['0', 'Brutto'], ['1', 'Netto']].map(m => '<button class="' + ((ev.net ? '1' : '0') === m[0] ? 'on' : '') + '" data-act="net" data-id="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>' : '') + '</div>' +
+      '<p class="muted small">' + (ev.entry === 'holes' ? (fmt === 'strokes' ? 'Hra na rány: zapište rány na každé jamce, součet se spočítá sám. Netto = rány minus hrací HCP. Do pořadí se počítá jen úplná karta.' : 'Stableford: zapište rány na každé jamce a body se spočítají samy podle paru, indexu jamky a hracího HCP. Nedohraná jamka zůstane prázdná a je za 0 bodů.') : fmt === 'strokes' ? 'Hra na rány: vyhrává nejnižší počet ran. Zapisujte to, na čem jste se dohodli (netto nebo brutto), u všech stejně.' : 'Hra na stablefordové body: vyhrává nejvíc bodů.') + ' Při shodě se hráči o místo dělí.</p>' +
+      (ev.entry === 'holes' ? cardsHtml(ev, order, dis) : '<div class="resgrid">' + order.map(p => '<label class="res"><span>' + esc(nm(p)) + '</span><input type="text" inputmode="numeric" id="rs-' + p + '" data-r="' + p + '" value="' + (typeof res[p] === 'number' ? res[p] : '') + '" placeholder="' + (fmt === 'strokes' ? 'rány' : 'body') + '"' + dis + '></label>').join('') + '</div>');
+    if (rows.length) {
+      h += '<table><thead><tr><th class="rk">#</th><th>Hráč</th><th class="val">' + (fmt === 'strokes' ? 'Rány' : 'Body') + '</th></tr></thead><tbody>' +
+        rows.map(r => '<tr><td class="rk">' + r.rank + '.</td><td>' + esc(nm(r.pid)) + '</td><td class="val">' + r.val + '</td></tr>').join('') + '</tbody></table>' +
+        '<div class="stack"><div class="row" style="justify-content:space-between"><h2>Výsledky do skupiny</h2><button class="btn sm" data-act="copy" data-id="export-res">' + (ui.copied === 'export-res' ? 'Zkopírováno' : 'Zkopírovat') + '</button></div><textarea id="export-res" readonly>' +
+        esc(['🏆 ' + (ev.title || 'Golf') + ' – ' + fmtDate(ev.date) + ' (' + (fmt === 'strokes' ? 'na rány' : 'stableford') + ')', ''].concat(rows.map(r => r.rank + '. ' + nm(r.pid) + ' – ' + r.val + unit)).join('\n')) + '</textarea></div>';
+    } else h += '<p class="muted">Po kole sem zapište výsledek každého hráče. Pořadí se spočítá samo a započítá se do sezóny.</p>';
+    h += '</section>';
+  }
+  return h;
+}
+
+/* ---------- rány po jamkách ---------- */
+const courseOf = ev => ev.course || { par: Array(18).fill(4), si: Array.from({ length: 18 }, (_, i) => i + 1) };
+const phcpOf = (ev, p) => (ev.phcp && typeof ev.phcp[p] === 'number' ? ev.phcp[p] : Math.round(S.players[p] && typeof S.players[p].hcp === 'number' ? S.players[p].hcp : 28));
+const cardOf = (ev, p) => Core.stableford((ev.cards || {})[p], courseOf(ev).par, courseOf(ev).si, phcpOf(ev, p));
+function sumText(ev, p) {
+  const r = cardOf(ev, p);
+  if (!r.filled) return 'zatím nic zapsáno';
+  return 'Rány ' + r.gross + (r.filled < 18 ? ' (' + r.filled + ' jamek)' : ' · netto ' + (r.gross - phcpOf(ev, p))) + ' · stableford ' + r.points + ' b.';
+}
+function recompute(ev) {
+  if (ev.entry !== 'holes') return;
+  ev.results = ev.results || {};
+  Object.keys(ev.cards || {}).forEach(p => {
+    const r = cardOf(ev, p);
+    const v = !r.filled ? null : ev.format === 'strokes' ? (r.filled < 18 ? null : ev.net ? r.gross - phcpOf(ev, p) : r.gross) : r.points;
+    if (v == null) delete ev.results[p]; else ev.results[p] = v;
+  });
+}
+function cardsHtml(ev, order, dis) {
+  const c = courseOf(ev), okSi = c.si.slice().sort((a, b) => a - b).every((v, i) => v === i + 1);
+  const cell = (a, i, v) => '<td><input type="text" inputmode="numeric" id="' + a + '-' + i + '" data-' + a + '="' + i + '" value="' + v + '" aria-label="' + (a === 'par' ? 'Par' : 'Index') + ' jamky ' + (i + 1) + '"' + dis + '></td>';
+  return '<div class="stack"><div class="scroll"><table class="course"><tr><th>Jamka</th>' + c.par.map((_, i) => '<th>' + (i + 1) + '</th>').join('') + '</tr><tr><th>Par</th>' + c.par.map((v, i) => cell('par', i, v)).join('') + '</tr><tr><th>Index</th>' + c.si.map((v, i) => cell('si', i, v)).join('') + '</tr></table></div>' +
+    (okSi ? '' : '<div class="note bad">Indexy jamek musí být čísla 1 až 18, každé právě jednou.</div>') +
+    (ev.course ? '<p class="muted small">Par a indexy jamek se uloží k této hře a příští hra je převezme.</p>' : '<div class="note">Par a index jamek opište ze skórkarty hřiště. Zatím jsou tu výchozí hodnoty (par 4, indexy 1–18) a body podle nich nebudou sedět.</div>') +
+    order.map(p => {
+      const card = (ev.cards || {})[p] || [];
+      return '<div class="card"><div class="row" style="justify-content:space-between"><b>' + esc(nm(p)) + '</b><label class="res small">Hrací HCP <input type="text" inputmode="numeric" id="gh-' + p + '" data-ph="' + p + '" value="' + phcpOf(ev, p) + '"' + dis + '></label></div><div class="holes">' +
+        c.par.map((_, i) => '<input type="text" inputmode="numeric" id="c-' + p + '-' + i + '" data-c="' + p + '" data-h="' + i + '" placeholder="' + (i + 1) + '" value="' + (typeof card[i] === 'number' ? card[i] : '') + '" aria-label="Rány na jamce ' + (i + 1) + '"' + dis + '>').join('') +
+        '</div><div class="tally" id="sum-' + p + '">' + esc(sumText(ev, p)) + '</div></div>';
+    }).join('') + '</div>';
+}
+
+function viewSeason() {
+  const all = events(), years = [...new Set(all.map(e => String(e.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  if (!years.includes(ui.year)) ui.year = years[0];
+  const evs = all.filter(e => String(e.date || '').slice(0, 4) === ui.year && Core.rank(e.results, e.format).length >= 2);
+  const rows = Core.season(evs).filter(r => S.players[r.pid]);
+  let h = '<section class="panel"><div class="row" style="justify-content:space-between"><h2>Pořadí sezóny</h2>' +
+    (years.length > 1 ? '<select id="season-year" style="width:auto" aria-label="Rok">' + years.map(y => '<option' + (y === ui.year ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>' : '<span class="tally">' + esc(ui.year || '') + '</span>') + '</div>' +
+    '<p class="muted small">Body za umístění: vítěz hry dostane tolik bodů, kolik hráčů mělo výsledek, každý další o bod méně. Díky tomu jdou sčítat hry na rány i na stableford. Při shodě bodů rozhoduje počet výher.</p>';
+  if (!rows.length) return h + '<p class="muted">Zatím tu nic není. Pořadí se naplní, jakmile u některé hry zapíšete výsledky aspoň dvou hráčů.</p></section>';
+  h += '<table><thead><tr><th class="rk">#</th><th>Hráč</th><th class="val">Her</th><th class="val">Výher</th><th class="val">Body</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td class="rk">' + r.rank + '.</td><td>' + esc(nm(r.pid)) + '</td><td class="val">' + r.events + '</td><td class="val">' + r.wins + '</td><td class="val"><b>' + r.points + '</b></td></tr>').join('') + '</tbody></table></section>';
+  h += '<section class="panel"><h2>Započítané hry (' + evs.length + ')</h2><table><tbody>' + evs.map(e => {
+    const rk = Core.rank(e.results, e.format).filter(r => S.players[r.pid]), win = rk.filter(r => r.rank === 1).map(r => nm(r.pid)).join(', ');
+    return '<tr><td>' + esc(e.title || 'Hra') + '<br><span class="muted small">' + esc(fmtDate(e.date)) + ' · ' + (e.format === 'strokes' ? 'na rány' : 'stableford') + '</span></td><td class="val">' + esc(win) + '</td></tr>';
+  }).join('') + '</tbody></table></section>';
+  return h;
+}
+
+function viewPlayers() {
+  const pl = players(), demo = pl.some(p => p.demo) || Object.values(S.events).some(e => e.demo);
+  return '<section class="panel"><h2>Hráči (' + pl.length + ')</h2>' +
+    '<form class="addrow edit" id="addPlayer"><label class="f">Jméno<input type="text" id="np-name" autocomplete="off" required></label><label class="f">HCP<input type="text" id="np-hcp" inputmode="decimal" placeholder="např. 18,4"></label><button class="btn">Přidat</button></form>' +
+    (pl.length ? '<table><thead><tr><th>Jméno</th><th class="num">HCP</th><th></th></tr></thead><tbody>' + pl.map(p =>
+      '<tr><td><input type="text" id="pn-' + p.id + '" data-p="' + p.id + '" data-pf="name" value="' + esc(p.name) + '" aria-label="Jméno"' + (S.readOnly ? ' disabled' : '') + '></td><td class="num"><input type="text" id="ph-' + p.id + '" inputmode="decimal" data-p="' + p.id + '" data-pf="hcp" value="' + (typeof p.hcp === 'number' ? fmtHcp(p.hcp) : '') + '" aria-label="HCP"' + (S.readOnly ? ' disabled' : '') + '></td><td class="act">' + (p.demo ? '<span class="tag">ukázka</span> ' : '') + cbtn('delPlayer', p.id, 'Smazat') + '</td></tr>').join('') + '</tbody></table>'
+      : '<p class="muted">Přidejte první hráče formulářem nahoře. HCP můžete doplnit později, bez něj se počítá s hodnotou 28.</p>') +
+    (demo ? '<div class="row edit">' + cbtn('delDemo', 'x', 'Smazat ukázková data', 'danger') + '</div>' : '') + '</section>';
+}
+
+function viewPairs() {
+  const pl = players(), ps = pairs();
+  const opts = '<option value="">vyberte…</option>' + pl.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('');
+  return '<section class="panel"><h2>Kdo s kým</h2><p class="muted">Trvalá přání, která skládání vždy dodrží: například manželé spolu, nebo dva hráči, kteří si mají dát pauzu. Když pravidlo dodržet nejde, flight se označí.</p>' +
+    (pl.length < 2 ? '<p class="muted">Nejdřív přidejte aspoň dva hráče.</p>' :
+      '<form class="pairrow edit" id="addPair"><label class="f">Hráč<select id="pa" required>' + opts + '</select></label><label class="f">Pravidlo<select id="pt"><option value="together">vždy spolu</option><option value="apart">nikdy spolu</option></select></label><label class="f">Hráč<select id="pb" required>' + opts + '</select></label><button class="btn">Přidat</button></form>') +
+    (ps.length ? '<table><tbody>' + ps.map((r, i) => '<tr><td>' + esc(nm(r.a)) + ' <span class="badge' + (r.type === 'together' ? ' ok' : '') + '">' + (r.type === 'together' ? 'vždy spolu' : 'nikdy spolu') + '</span> ' + esc(nm(r.b)) + '</td><td class="act">' + cbtn('delPair', r.a + '|' + r.b, 'Zrušit') + '</td></tr>').join('') + '</tbody></table>' : '<p class="muted small">Zatím žádné pravidlo.</p>') + '</section>';
+}
+
+/* ---------- akce ---------- */
+function setFlights(id, fl) { S.events[id].flights = fl; S.events[id].flightsAt = Date.now(); ui.pick = null; ui.copied = false; saveEv(id); }
+function savePairs(list) { S.settings.pairs = { list }; save('settings', 'pairs', S.settings.pairs); }
+const A = {
+  signIn() { S.fb.signIn().catch(() => { S.note = 'Přihlášení se nezdařilo nebo bylo zrušeno.'; S.noteBad = false; render(true); }); return false; },
+  signOut() { S.fb.signOut(); return false; },
+  tab(id) { ui.tab = id; try { localStorage.setItem('flighty-tab', id); } catch (e) {} },
+  sel(id) { ui.sel = id; ui.pick = null; ui.copied = false; try { localStorage.setItem('flighty-sel', id); } catch (e) {} },
+  ask(id, el) { ui.confirm = el.dataset.k; setTimeout(() => { if (ui.confirm === el.dataset.k) { ui.confirm = null; render(true); } }, 3500); },
+  newEvent() {
+    const id = uid('e'), last = events()[0];
+    S.events[id] = { title: last ? last.title : '', date: nextSaturday(), firstTee: last ? last.firstTee : '10:00', interval: last ? last.interval : 10, mode: last ? last.mode : 'balanced', format: last ? last.format || 'stb' : 'stb', entry: last ? last.entry || 'total' : 'total', signups: {}, flights: [] };
+    if (last && last.course) S.events[id].course = JSON.parse(JSON.stringify(last.course));
+    A.sel(id); saveEv(id);
+  },
+  delEvent(id) { delete S.events[id]; save('events', id, null); ui.sel = null; },
+  su(pid) {
+    const ev = S.events[ui.sel]; ev.signups = ev.signups || {};
+    const cur = ev.signups[pid]; if (!cur) ev.signups[pid] = 'yes'; else if (cur === 'yes') ev.signups[pid] = 'no'; else delete ev.signups[pid];
+    saveEv(ui.sel);
+  },
+  allYes() { const ev = S.events[ui.sel]; ev.signups = {}; Object.keys(S.players).forEach(p => (ev.signups[p] = 'yes')); saveEv(ui.sel); },
+  allNone() { S.events[ui.sel].signups = {}; saveEv(ui.sel); },
+  mode(m) { S.events[ui.sel].mode = m; saveEv(ui.sel); },
+  fmt(f) { const ev = S.events[ui.sel]; ev.format = f; recompute(ev); saveEv(ui.sel); },
+  entry(m) { const ev = S.events[ui.sel]; ev.entry = m; recompute(ev); saveEv(ui.sel); },
+  net(v) { const ev = S.events[ui.sel]; ev.net = v === '1'; recompute(ev); saveEv(ui.sel); },
+  resetTimes() { S.events[ui.sel].times = []; saveEv(ui.sel); },
+  lock() { const ev = S.events[ui.sel]; ev.locked = !ev.locked; ev.lockedAt = Date.now(); ui.pick = null; saveEv(ui.sel); },
+  gen() { const ev = S.events[ui.sel]; setFlights(ui.sel, Core.generate(going(ev), ctxFor(ui.sel))); },
+  repair() { const ev = S.events[ui.sel]; setFlights(ui.sel, Core.repair(ev.flights || [], going(ev), ctxFor(ui.sel))); },
+  pick(pid) {
+    const ev = S.events[ui.sel];
+    if (S.readOnly || ev.locked) return;
+    if (!ui.pick) { ui.pick = pid; return; }
+    if (ui.pick === pid) { ui.pick = null; return; }
+    const fl = ev.flights.map(f => f.map(p => (p === pid ? ui.pick : p === ui.pick ? pid : p)));
+    setFlights(ui.sel, fl);
+  },
+  moveTo(i) {
+    const ev = S.events[ui.sel], shown = ev.flights.map(f => f.filter(p => S.players[p])).filter(f => f.length);
+    const fl = shown.map((f, x) => (x === +i ? f.concat(ui.pick) : f.filter(p => p !== ui.pick))).filter(f => f.length);
+    setFlights(ui.sel, fl);
+  },
+  up(i) { const fl = S.events[ui.sel].flights.filter(f => f.length); i = +i; [fl[i - 1], fl[i]] = [fl[i], fl[i - 1]]; setFlights(ui.sel, fl); },
+  down(i) { A.up(+i + 1); },
+  copy(id) {
+    const t = $(id);
+    const done = () => { ui.copied = id; render(); };
+    const fallback = () => { t.focus(); t.select(); S.note = 'Text je označený, zkopírujte ho klávesami Ctrl/Cmd + C.'; S.noteBad = false; render(true); };
+    try { navigator.clipboard.writeText(t.value).then(done, fallback); } catch (e) { fallback(); }
+    return false;
+  },
+  delPlayer(id) { delete S.players[id]; save('players', id, null); },
+  delPair(k) { savePairs(((S.settings.pairs || {}).list || []).filter(r => r.a + '|' + r.b !== k)); },
+  demo() {
+    const names = [['Petr N.', 8.2], ['Jana K.', 24.5], ['Martin S.', 15.1], ['Lucie D.', 31], ['Tomáš V.', 11.7], ['Eva P.', 19.3], ['Karel H.', 27.8], ['Monika B.', 36], ['Ondřej M.', 5.4], ['Hana R.', 22], ['Jiří Č.', 17.6], ['Alena Z.', 29.4]];
+    const ids = names.map(n => { const id = uid('p'); S.players[id] = { name: n[0], hcp: n[1], demo: true }; save('players', id, S.players[id]); return id; });
+    const id = uid('e'), signups = {}; ids.forEach((p, i) => (signups[p] = i === 7 ? 'no' : 'yes'));
+    S.events[id] = { title: 'Ukázková hra', date: nextSaturday(), firstTee: '10:00', interval: 10, mode: 'balanced', signups, flights: [], demo: true };
+    S.events[id].flights = Core.generate(going(S.events[id]), ctxFor(id));
+    A.sel(id); saveEv(id);
+  },
+  delDemo() {
+    Object.keys(S.players).filter(p => S.players[p].demo).forEach(p => A.delPlayer(p));
+    Object.keys(S.events).filter(e => S.events[e].demo).forEach(e => { delete S.events[e]; save('events', e, null); });
+  },
+};
+
+$('root').addEventListener('click', e => {
+  const tab = e.target.closest('.tab'); if (tab) { A.tab(tab.dataset.tab); ui.confirm = null; render(); return; }
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const act = el.dataset.act;
+  if (S.readOnly && !['sel', 'tab', 'copy', 'pick', 'signIn', 'signOut'].includes(act)) return;
+  if ((S.events[ui.sel] || {}).locked && ['su', 'allYes', 'allNone', 'mode', 'gen', 'repair', 'moveTo', 'up', 'down', 'fmt', 'delEvent', 'resetTimes', 'entry', 'net'].includes(act)) return;
+  if (act !== 'ask') ui.confirm = null;
+  if (act !== 'copy') ui.copied = false;
+  if (A[act](el.dataset.id, el) !== false) render();
+});
+$('app').addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'season-year') { ui.year = t.value; t.blur(); render(); return; }
+  if (S.readOnly) return;
+  const d = t.dataset;
+  if ((d.f || d.r || d.t || d.c || d.ph || d.par || d.si) && (S.events[ui.sel] || {}).locked) return;
+  if ((d.c || d.ph || d.par || d.si) && S.events[ui.sel]) {
+    const ev = S.events[ui.sel], n = parseInt(t.value, 10), ok = isFinite(n);
+    if (d.c) {
+      ev.cards = ev.cards || {};
+      const card = (ev.cards[d.c] || []).slice(); while (card.length < 18) card.push(null);
+      card[+d.h] = ok && n > 0 && n < 30 ? n : null; ev.cards[d.c] = card;
+    } else if (d.ph) {
+      ev.phcp = ev.phcp || {};
+      if (ok && n >= -10 && n <= 54) ev.phcp[d.ph] = n; else delete ev.phcp[d.ph];
+    } else {
+      const c = courseOf(ev); ev.course = { par: c.par.slice(), si: c.si.slice() };
+      if (d.par) { if (ok && n >= 3 && n <= 6) ev.course.par[+d.par] = n; } else if (ok && n >= 1 && n <= 18) ev.course.si[+d.si] = n;
+    }
+    recompute(ev); saveEv(ui.sel);
+    if (d.c && $('sum-' + d.c)) $('sum-' + d.c).textContent = sumText(ev, d.c);
+    render(true); return;
+  }
+  if (t.dataset.t && S.events[ui.sel]) {
+    const ev = S.events[ui.sel], times = (ev.times || []).slice(), i = +t.dataset.t;
+    while (times.length <= i) times.push('');
+    times[i] = t.value; ev.times = times;
+    saveEv(ui.sel); render(true);
+  } else if (t.dataset.r && S.events[ui.sel]) {
+    const ev = S.events[ui.sel], n = parseInt(t.value, 10);
+    ev.results = ev.results || {};
+    if (isFinite(n) && n >= 0 && n < 300) ev.results[t.dataset.r] = n; else delete ev.results[t.dataset.r];
+    saveEv(ui.sel); render(true);
+  } else if (t.dataset.f && S.events[ui.sel]) {
+    S.events[ui.sel][t.dataset.f] = t.dataset.f === 'interval' ? +t.value : t.value.trim();
+    saveEv(ui.sel); render(true);
+  } else if (t.dataset.p && S.players[t.dataset.p]) {
+    const p = S.players[t.dataset.p];
+    if (t.dataset.pf === 'name') { if (t.value.trim()) p.name = t.value.trim(); }
+    else { const h = parseHcp(t.value); if (h == null) delete p.hcp; else p.hcp = h; }
+    save('players', t.dataset.p, p); render(true);
+  }
+});
+$('app').addEventListener('focusout', () => setTimeout(() => { if (dirty) render(true); }, 0));
+$('app').addEventListener('submit', e => {
+  e.preventDefault();
+  if (S.readOnly) return;
+  if (e.target.id === 'addPlayer') {
+    const name = $('np-name').value.trim(); if (!name) return;
+    const id = uid('p'), h = parseHcp($('np-hcp').value);
+    S.players[id] = h == null ? { name } : { name, hcp: h };
+    save('players', id, S.players[id]); render(); $('np-name').focus();
+  } else if (e.target.id === 'addPair') {
+    const a = $('pa').value, b = $('pb').value, type = $('pt').value;
+    if (!a || !b || a === b) { S.note = 'Vyberte dva různé hráče.'; S.noteBad = false; render(); return; }
+    S.note = '';
+    const list = ((S.settings.pairs || {}).list || []).filter(r => Core.key(r.a, r.b) !== Core.key(a, b));
+    list.push({ a, b, type }); savePairs(list); render();
+  }
+});
+init();
+})();
+</script>
+
+</body>
+</html>
