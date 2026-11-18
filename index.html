@@ -484,7 +484,7 @@ const cbtn = (act, id, label, cls) => {
 
 function viewEvents() {
   const pl = players(), evs = events();
-  if (!pl.length && S.readOnly) return '<div class="panel empty"><h2>Zatím tu nic není</h2><p class="muted">Správce ještě nepřidal hráče ani hry. Jakmile to udělá, uvidíte tu flighty, startovní časy a výsledky.</p></div>';
+  if (!pl.length && S.readOnly) return '<div class="panel empty"><h2>Zatím tu nic není</h2><p class="muted">Správce ještě nepřidal hráče ani hry. Jakmile to udělá, uvidíte tu flighty, startovní časy a výsledky.</p>' + (S.fb ? '<p class="muted small">Jste správce? Přihlaste se Google účtem. Teprve potom se objeví úpravy, karta Dvojice a ukázková data.</p><button class="btn" data-act="signIn">Přihlášení správce</button>' : '') + '</div>';
   if (!pl.length) return '<div class="panel empty"><h2>Zatím tu nejsou žádní hráči</h2><p class="muted">Začněte seznamem lidí, se kterými jezdíte. Stačí jméno a HCP. Nebo si aplikaci nejdřív vyzkoušejte na ukázkové skupině, kterou pak jedním tlačítkem smažete.</p><div class="row edit"><button class="btn" data-act="tab" data-id="hraci">Přidat hráče</button><button class="btn ghost" data-act="demo">Vyzkoušet s ukázkovou skupinou</button></div></div>';
   if (!S.events[ui.sel]) ui.sel = evs.length ? evs[0].id : null;
   let h = '<div class="evbar">' + evs.map(e => '<button class="evchip' + (e.id === ui.sel ? ' on' : '') + '" data-act="sel" data-id="' + e.id + '">' + esc(e.title || 'Hra') + '<small>' + esc(fmtDate(e.date)) + '</small></button>').join('') + '<button class="btn ghost edit" data-act="newEvent">+ Nová hra</button></div>';
@@ -637,7 +637,17 @@ function viewPairs() {
 function setFlights(id, fl) { S.events[id].flights = fl; S.events[id].flightsAt = Date.now(); ui.pick = null; ui.copied = false; saveEv(id); }
 function savePairs(list) { S.settings.pairs = { list }; save('settings', 'pairs', S.settings.pairs); }
 const A = {
-  signIn() { S.fb.signIn().catch(() => { S.note = 'Přihlášení se nezdařilo nebo bylo zrušeno.'; S.noteBad = false; render(true); }); return false; },
+  signIn() {
+    S.fb.signIn().catch(e => {
+      const c = (e && e.code) || '';
+      S.note = c === 'auth/popup-blocked' ? 'Prohlížeč zablokoval přihlašovací okno. Povolte pro tuto stránku vyskakovací okna a klikněte na Přihlášení správce znovu.'
+        : c === 'auth/unauthorized-domain' ? 'Z této adresy není přihlášení povolené. Otevřete stránku na její veřejné adrese.'
+        : c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request' ? 'Přihlašovací okno se zavřelo dřív, než jste se přihlásili. Zkuste to znovu.'
+        : 'Přihlášení se nezdařilo (' + (c || 'neznámá chyba') + '). Zkuste to znovu.';
+      S.noteBad = c !== 'auth/popup-closed-by-user' && c !== 'auth/cancelled-popup-request'; render(true);
+    });
+    return false;
+  },
   signOut() { S.fb.signOut(); return false; },
   tab(id) { ui.tab = id; try { localStorage.setItem('flighty-tab', id); } catch (e) {} },
   sel(id) { ui.sel = id; ui.pick = null; ui.copied = false; try { localStorage.setItem('flighty-sel', id); } catch (e) {} },
